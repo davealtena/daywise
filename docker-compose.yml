@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: daywise-postgres
+    environment:
+      POSTGRES_DB: daywise
+      POSTGRES_USER: daywise
+      POSTGRES_PASSWORD: daywise123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - daywise-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: daywise-redis
+    command: redis-server --requirepass redis123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - daywise-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: daywise-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - daywise-network
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: daywise-backend
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://daywise:daywise123@postgres:5432/daywise
+      JWT_SECRET: development-jwt-secret
+      REDIS_URL: redis://:redis123@redis:6379
+      OLLAMA_URL: http://ollama:11434
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+      - ollama
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - daywise-network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+
+networks:
+  daywise-network:
+    driver: bridge
